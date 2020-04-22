@@ -1,0 +1,265 @@
+#Importing the different packages necessary for the task at hand. 
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import nltk
+import string
+import re
+
+from sklearn import metrics
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn import feature_extraction, linear_model, model_selection, preprocessing
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import SGDClassifier
+from sklearn.metrics import classification_report, f1_score
+
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import RegexpTokenizer
+from nltk.stem.porter import PorterStemmer
+from nltk.probability import FreqDist
+
+#Loading the two necessary datasets to apply change on them and run different algorithms
+
+train_data = pd.read_csv("train.csv")
+test_data = pd.read_csv("test.csv")
+
+#Computing the numbers of nulls within each columns of the dataset
+
+train_data.isnull().sum()
+
+cols_to_drop = ['id', 'keyword', 'location']
+
+train_data = train_data.drop(cols_to_drop, axis=1)
+test_data = test_data.drop(cols_to_drop, axis = 1)
+
+#Checking for the distribution of the target variable
+
+train_data.target.value_counts()
+
+#Cheking for the lenght distribution of the text, to see if it is relevant to create a dedicated feature. 
+
+#Creating a new dataframe to add lenght without touching to our original one
+train_data_len = train_data
+test_data_len = train_data
+
+#Defining the lenght function
+def length(text):    
+    return len(text)
+
+#Applying the function and creating column lenght
+train_data_len['lenght'] = train_data['text'].apply(length)
+
+#Plotting distribution
+plt.title('Length diststribution')
+sns.distplot(train_data_len[train_data_len['target']==0]['lenght'][0:],label='Not Disaster')
+sns.distplot(train_data_len[train_data_len['target']==1]['lenght'][0:],label='Disaster')
+plt.legend()
+
+#Splitting dataset into train and test
+X_train_SB, X_test_SB, y_train_SB, y_test_SB = train_test_split(train_data['text'],train_data['target'],random_state = 0)
+
+#Creating the pipeline including the Count Vectorizer with a TFIDF transfomer on top of it. 
+pipeline_sgd_baseline = Pipeline([
+    ('vect', CountVectorizer()),
+    ('tfidf',  TfidfTransformer()),
+    ('nb', SGDClassifier()),
+])
+model_sgd_baseline = pipeline_sgd_baseline.fit(X_train_SB, y_train_SB)
+
+y_predict_SB = model_sgd_baseline.predict(X_test_SB)
+
+#Printing classification report 
+print(classification_report(y_test_SB, y_predict_SB))
+
+#Creating submission dataset to upload on Kaggl
+submission_test = test_data['text']
+sample_submission_sgd_baseline = pd.read_csv("sample_submission.csv")
+sample_submission_sgd_baseline["target"] = model_sgd_baseline.predict(submission_test)
+sample_submission_sgd_baseline.to_csv("Submission_sgd_baseline", index = False)
+      
+      
+X_train_LB, X_test_LB, y_train_LB, y_test_LB = train_test_split(train_data['text'],train_data['target'],random_state = 0)
+
+pipeline_lr_baseline = Pipeline([
+    ('vect', CountVectorizer()),
+    ('tfidf',  TfidfTransformer()),
+    ('nb', LogisticRegression()),
+])
+model_lr_baseline = pipeline_lr_baseline.fit(X_train_LB, y_train_LB)
+
+y_predict_LB = model_lr_baseline.predict(X_test_LB)
+
+print(classification_report(y_test_LB, y_predict_LB))
+
+sample_submission_lr_baseline = pd.read_csv("sample_submission.csv")
+sample_submission_lr_baseline["target"] = model_lr_baseline.predict(submission_test)
+sample_submission_lr_baseline.to_csv("Submission_lr_baseline", index = False)
+
+#0.75971
+
+# Creating Multionomial pipeline and scoring table
+X_train_MB, X_test_MB, y_train_MB, y_test_MB = train_test_split(train_data['text'],train_data['target'],random_state = 0)
+
+pipeline_ml_baseline = Pipeline([
+    ('vect', CountVectorizer()),
+    ('tfidf',  TfidfTransformer()),
+    ('nb', MultinomialNB()),
+])
+model_ml_baseline = pipeline_ml_baseline.fit(X_train_MB, y_train_MB)
+
+y_predict_MB = model_ml_baseline.predict(X_test_MB)
+
+print(classification_report(y_test_MB, y_predict_MB))
+
+sample_submission_ml_baseline = pd.read_csv("sample_submission.csv")
+sample_submission_ml_baseline["target"] = model_ml_baseline.predict(submission_test)
+sample_submission_ml_baseline.to_csv("Submission_ml_baseline", index = False)
+
+#Printing Kaggle Scores 
+print("Kaggle Final Score for SGD is: 77%")
+print("Kaggle Final Score for LR is: 76%")
+print("Kaggle Final Score for MNB is: 78%")
+
+
+# Loading data into new names 
+
+train_data_p = pd.read_csv("train.csv")
+test_data_p = pd.read_csv("test.csv")
+
+cols_to_drop = ['id', 'keyword', 'location']
+
+train_data_p = train_data_p.drop(cols_to_drop, axis=1)
+test_data_p = test_data_p.drop(cols_to_drop, axis = 1)
+
+train_data.head()
+
+
+# Creating functions
+
+# Remove punctuation
+def remove_punct(text):
+    no_punct = "".join([c for c in text if c not in string.punctuation])
+    return no_punct
+
+# Lemmatization
+def word_lemmat(text):
+    lemmatizer = WordNetLemmatizer()
+    lemmat_text = [lemmatizer.lemmatize(i) for i in text]
+    return lemmat_text
+
+# Stemming
+def word_stemmer(text):
+    stemmer = PorterStemmer()
+    stem_text = [stemmer.stem(i) for i in text]
+    return stem_text
+    
+# Remove stop words
+def remove_stopw(text):
+    stop_w = set(stopwords.words("english"))
+    words = " ".join([w for w in text if w not in stop_w])
+    return words
+    
+# Applying function on the train dataset
+
+# Remove special caracteres
+train_data_p['text'] = train_data_p['text'].str.replace('[^A-Za-z0-9+]', ' ')
+
+train_data_p['text'] = train_data_p['text'].apply(lambda x: remove_punct(x.lower().strip()))
+
+#Tokenize to apply lemmatizing and stemming so it does not consider every character separately but as bllocks forming words
+train_data_p['text'] = train_data_p['text'].apply(word_tokenize)
+train_data_p['text'] = train_data_p['text'].apply(lambda x: word_lemmat(x))
+train_data_p['text'] = train_data_p['text'].apply(lambda x: word_stemmer(x))
+train_data_p['text'] = train_data_p['text'].apply(lambda x: remove_stopw(x))
+
+# Applying function on the test dataset
+
+test_data_p['text'] = test_data_p['text'].str.replace('[^A-Za-z0-9+]', ' ')
+
+test_data_p['text'] = test_data_p['text'].apply(lambda x: remove_punct(x.lower().strip()))
+test_data_p['text'] = test_data_p['text'].apply(word_tokenize)
+test_data_p['text'] = test_data_p['text'].apply(lambda x: word_lemmat(x))
+test_data_p['text'] = test_data_p['text'].apply(lambda x: word_stemmer(x))
+test_data_p['text'] = test_data_p['text'].apply(lambda x: remove_stopw(x))
+
+# Creating SGD pipeline and scoring table
+
+X_train_SP, X_test_SP, y_train_SP, y_test_SP = train_test_split(train_data_p['text'],train_data_p['target'],random_state = 0)
+
+pipeline_sgd_processed = Pipeline([
+    ('vect', CountVectorizer()),
+    ('tfidf',  TfidfTransformer()),
+    ('nb', SGDClassifier()),
+])
+model_sgd_processed = pipeline_sgd_processed.fit(X_train_SP, y_train_SP)
+
+y_predict_SP = model_sgd_processed.predict(X_test_SP)
+
+print(classification_report(y_test_SP, y_predict_SP))
+
+submission_test_p = test_data_p['text']
+sample_submission_sgd_processed = pd.read_csv("sample_submission.csv")
+sample_submission_sgd_processed["target"] = model_sgd_processed.predict(submission_test_p)
+sample_submission_sgd_processed.to_csv("Submission_sgd_processed", index = False)
+
+#0.78323
+
+# Creating Logistic Regression pipeline and scoring table
+
+X_train_LP, X_test_LP, y_train_LP, y_test_LP = train_test_split(train_data_p['text'],train_data_p['target'],random_state = 0)
+
+pipeline_lr_processed = Pipeline([
+    ('vect', CountVectorizer()),
+    ('tfidf',  TfidfTransformer()),
+    ('nb', LogisticRegression()),
+])
+model_lr_processed = pipeline_lr_processed.fit(X_train_LP, y_train_LP)
+
+y_predict_LP = model_lr_processed.predict(X_test_LP)
+
+print(classification_report(y_test_LP, y_predict_LP))
+
+sample_submission_lr_processed = pd.read_csv("sample_submission.csv")
+sample_submission_lr_processed["target"] = model_lr_processed.predict(submission_test_p)
+sample_submission_lr_processed.to_csv("Submission_lr_processed", index = False)
+
+#0.78220
+
+# Creating Multionomial pipeline and scoring table
+
+X_train_MP, X_test_MP, y_train_MP, y_test_MP = train_test_split(train_data_p['text'],train_data_p['target'],random_state = 0)
+
+pipeline_ml_processed = Pipeline([
+    ('vect', CountVectorizer()),
+    ('tfidf',  TfidfTransformer()),
+    ('nb', MultinomialNB()),
+])
+model_ml_processed = pipeline_ml_processed.fit(X_train_MP, y_train_MP)
+
+y_predict_MP = model_ml_processed.predict(X_test_MP)
+
+print(classification_report(y_test_MP, y_predict_MP))
+
+sample_submission_ml_processed = pd.read_csv("sample_submission.csv")
+sample_submission_ml_processed["target"] = model_ml_processed.predict(submission_test_p)
+sample_submission_ml_processed.to_csv("Submission_ml_processed", index = False)
+
+# 0.79959
+
+#Printing Kaggle Scores 
+print("Kaggle Final Score for SGD Processed is: 78.3%")
+print("Kaggle Final Score for LR Processed is: 78.2%")
+print("Kaggle Final Score for MNB Processed is: 80%")
+
+
+
+ 
